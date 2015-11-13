@@ -115,17 +115,22 @@ def instances(path):
 
     return arrays
 
-
+CACHED_DATA = {}
 def get_labelled_yn_data_for_person(person_id):
     # british is 1:37
     # print 'getting labels for', person_id
-    yes_instances = instances(
-        '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p{person_id}/yes/'.format(person_id=person_id)
-    )
+    if person_id in CACHED_DATA:
+        yes_instances = CACHED_DATA[person_id]['yes']
+        no_instances = CACHED_DATA[person_id]['no']
+    else:
+        yes_instances = instances(
+            '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p{person_id}/yes/'.format(person_id=person_id)
+        )
 
-    no_instances = instances(
-        '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p{person_id}/no/'.format(person_id=person_id)
-    )
+        no_instances = instances(
+            '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p{person_id}/no/'.format(person_id=person_id)
+        )
+        CACHED_DATA[person_id] = {'yes': yes_instances, 'no': no_instances}
 
     vectors = yes_instances + no_instances
     labels = ([1] * len(yes_instances)) + ([0] * len(no_instances))
