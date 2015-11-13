@@ -90,7 +90,7 @@ def standardise_to_dimensions(trimmed):
     resized = imresize(trimmed, (OUTPUT_ROWS, OUTPUT_COLS))
     # could re-normalize here also.
     #show_plot(resized)
-    return normalize(resized)
+    return normalize(resized.astype(float))
 
 def get_normalised_vector(fname):
     spectrum = get_power_spectrum_of_wave(fname)
@@ -118,7 +118,7 @@ def instances(path):
 
 def get_labelled_yn_data_for_person(person_id):
     # british is 1:37
-    print 'getting labels for', person_id
+    # print 'getting labels for', person_id
     yes_instances = instances(
         '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p{person_id}/yes/'.format(person_id=person_id)
     )
@@ -131,33 +131,36 @@ def get_labelled_yn_data_for_person(person_id):
     labels = ([1] * len(yes_instances)) + ([0] * len(no_instances))
     return vectors, labels
 
+def test_person(person_id):
+    british_ids = set(xrange(1, 38))
+    test_person = person_id
+    british_ids.remove(test_person)
+    print 'Test Person:', test_person
 
-british_ids = set(xrange(1, 38))
-test_person = 5
-british_ids.remove(test_person)
-print 'Test Person:', test_person
+    test_vectors, test_labels = get_labelled_yn_data_for_person(test_person)
+    if not test_vectors:
+        print 'No Samples for person ', person_id, ' - skipping'
+        return 0, 0
+    training_vectors, training_labels = [], []
 
+    for person_id in british_ids:
+        vectors, labels = get_labelled_yn_data_for_person(person_id)
 
-test_vectors, test_labels = get_labelled_yn_data_for_person(test_person)
+        training_vectors += vectors
+        training_labels += labels
 
-training_vectors, training_labels = [], []
+    from predictor import train_and_test
 
-for person_id in british_ids:
-    vectors, labels = get_labelled_yn_data_for_person(person_id)
-    training_vectors += vectors
-    training_labels += labels
+    return train_and_test(training_vectors, training_labels, test_vectors, test_labels)
 
-print 'Training vectors:', len(training_vectors)
+total_right, total_wrong = 0, 0
+for i in xrange(1, 38):
+    try:
+        right, wrong = test_person(i)
+        total_right += right
+        total_wrong += wrong
+    except Exception, e:
+        pass
 
-#yes_train, yes_test = yes_instances[:65], yes_instances[65:]
-#no_train, no_test = no_instances[:65], no_instances[65:]
-
-#training_vectors = yes_train + no_train
-#training_labels = ([1] * len(yes_train)) + ([0] * len(no_train))
-
-#test_vectors = yes_test + no_test
-#test_labels = ([1] * len(yes_test)) + ([0] * len(no_test))
-
-from predictor import train_and_test
-
-train_and_test(training_vectors, training_labels, test_vectors, test_labels)
+print total_right, total_wrong
+print 100 * (total_right / float(total_right + total_wrong))
