@@ -28,9 +28,7 @@ def convert_frequency_to_mel(freq):
 def convert_mel_to_frequency(mel):
     return 700 * (math.exp(mel/1127) - 1)
 
-def get_power_spectrum_of_wave(filename):
-    sample_rate, data = read(filename)
-
+def get_power_spectrum_of_wave(sample_rate, data):
     noverlap = 96
     nfft = 128
 
@@ -92,80 +90,17 @@ def standardise_to_dimensions(trimmed):
     #show_plot(resized)
     return normalize(resized.astype(float))
 
-def get_normalised_vector(fname):
-    spectrum = get_power_spectrum_of_wave(fname)
+def get_normalised_vector(filename=None, data=None, sample_rate=None):
+
+    if data:
+        sample_rate = 8000 # derp.
+    elif filename:
+        sample_rate, data = read(filename)
+
+
+    spectrum = get_power_spectrum_of_wave(sample_rate, data)
     scaled_spectrum = scale_power_spectrum_to_mel_scale(spectrum)
     normalized = normalize(scaled_spectrum)
     trimmed = trim_start_end_silence(normalized)
     standardised = standardise_to_dimensions(trimmed)
     return standardised.flatten()
-
-def instances(path):
-    filenames = os.listdir(path)
-    arrays = []
-    for filename in filenames:
-        if filename.endswith('.wav'):
-            f_name = path + filename
-            try:
-                vect = get_normalised_vector(f_name)
-            except Exception, e:
-                continue
-
-            arrays.append(vect)
-
-    return arrays
-
-CACHED_DATA = {}
-def get_labelled_yn_data_for_person(person_id):
-    # british is 1:37
-    # print 'getting labels for', person_id
-    if person_id in CACHED_DATA:
-        yes_instances = CACHED_DATA[person_id]['yes']
-        no_instances = CACHED_DATA[person_id]['no']
-    else:
-        yes_instances = instances(
-            '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p{person_id}/yes/'.format(person_id=person_id)
-        )
-
-        no_instances = instances(
-            '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p{person_id}/no/'.format(person_id=person_id)
-        )
-        CACHED_DATA[person_id] = {'yes': yes_instances, 'no': no_instances}
-
-    vectors = yes_instances + no_instances
-    labels = ([1] * len(yes_instances)) + ([0] * len(no_instances))
-    return vectors, labels
-
-def test_person(person_id):
-    british_ids = set(xrange(1, 38))
-    test_person = person_id
-    british_ids.remove(test_person)
-    print 'Test Person:', test_person
-
-    test_vectors, test_labels = get_labelled_yn_data_for_person(test_person)
-    if not test_vectors:
-        print 'No Samples for person ', person_id, ' - skipping'
-        return 0, 0
-    training_vectors, training_labels = [], []
-
-    for person_id in british_ids:
-        vectors, labels = get_labelled_yn_data_for_person(person_id)
-
-        training_vectors += vectors
-        training_labels += labels
-
-    from predictor import train_and_test
-
-    return train_and_test(training_vectors, training_labels, test_vectors, test_labels)
-
-total_right, total_wrong = 0, 0
-for i in xrange(1, 38):
-    try:
-        right, wrong = test_person(i)
-        total_right += right
-        total_wrong += wrong
-    except Exception, e:
-        pass
-
-print total_right, total_wrong
-print 100 * (total_right / float(total_right + total_wrong))

@@ -1,10 +1,15 @@
 import sklearn
 from sklearn import svm
 
-def train_and_test(training_vectors, training_labels, test_vectors, test_labels):
+def train_with_data(training_vectors, training_labels):
     classifier = svm.SVC(C=50) # (C=50, gamma=1)
-
     classifier.fit(training_vectors, training_labels)
+
+    return classifier
+
+
+def train_and_test(training_vectors, training_labels, test_vectors, test_labels):
+    classifier = train_with_data(training_vectors, training_labels)
 
     score = classifier.score(test_vectors, test_labels)
     # print classifier.decision_function(test_vectors)
