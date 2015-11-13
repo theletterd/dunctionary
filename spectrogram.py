@@ -1,20 +1,20 @@
+import os
 from scipy.io.wavfile import read
 from scipy.signal import periodogram
 from scipy.signal import get_window
 from matplotlib.mlab import specgram
 from sklearn.preprocessing import normalize
+from scipy.misc import imresize
 
 import matplotlib.pyplot as plt
 
 import math
 import numpy
 
-fname = '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p8/five/five1.wav'
-#fname = '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p8/letters/H1.wav'
 
 MAX_FREQ = 4000
-OUTPUT_ROWS = 100
-OUTPUT_COLS = 100
+OUTPUT_ROWS = 20
+OUTPUT_COLS = 50
 
 def show_plot(spectrum):
     fig = plt.figure()
@@ -29,7 +29,7 @@ def convert_mel_to_frequency(mel):
     return 700 * (math.exp(mel/1127) - 1)
 
 def get_power_spectrum_of_wave(filename):
-    sample_rate, data = read(fname)
+    sample_rate, data = read(filename)
 
     noverlap = 96
     nfft = 128
@@ -62,12 +62,13 @@ def scale_power_spectrum_to_mel_scale(spectrum):
                 ) * mels_per_bucket
             )
         )
-    )
+    ).astype(int)
     # get start of each mel bucket
     row_coordinates = [
         (bucket_start_end_indices[i], bucket_start_end_indices[i + 1])
         for i in xrange(len(bucket_start_end_indices) - 1)
     ]
+
     scaled_matrix = numpy.array([
         sum(repeated_matrix[coord[0]:coord[1], :]) for coord in row_coordinates
     ])
@@ -78,25 +79,85 @@ def scale_power_spectrum_to_mel_scale(spectrum):
 def trim_start_end_silence(spectrum):
     normalized = normalize(spectrum)
     mean = numpy.mean(normalized)
-    relevant_indices = numpy.where(numpy.mean(normalized, axis=0) > mean)
+    relevant_indices = numpy.where(numpy.mean(normalized, axis=0) > 0.1) #
     first_index = relevant_indices[0][0]
     last_index = relevant_indices[0][-1]
 
     trimmed_spectrum = normalized[:, first_index:last_index + 1]
-
-    # could re-normalize here?
-
     return trimmed_spectrum
 
-spectrum = get_power_spectrum_of_wave(fname)
-scaled_spectrum = scale_power_spectrum_to_mel_scale(spectrum)
-normalized = normalize(scaled_spectrum)
-trimmed = trim_start_end_silence(normalized)
-show_plot(trimmed)
+def standardise_to_dimensions(trimmed):
+    resized = imresize(trimmed, (OUTPUT_ROWS, OUTPUT_COLS))
+    # could re-normalize here also.
+    #show_plot(resized)
+    return normalize(resized)
 
-#rows = len(spectrum)
-#cols = len(spectrum[0])
-#print len(spectrum)
-#print len(spectrum[0])
-#mean_power = sum(spectrum) / float(rows)
-#print mean_power
+def get_normalised_vector(fname):
+    spectrum = get_power_spectrum_of_wave(fname)
+    scaled_spectrum = scale_power_spectrum_to_mel_scale(spectrum)
+    normalized = normalize(scaled_spectrum)
+    trimmed = trim_start_end_silence(normalized)
+    standardised = standardise_to_dimensions(trimmed)
+    return standardised.flatten()
+
+def instances(path):
+    filenames = os.listdir(path)
+    arrays = []
+    for filename in filenames:
+        if filename.endswith('.wav'):
+            f_name = path + filename
+            try:
+                vect = get_normalised_vector(f_name)
+            except Exception, e:
+                continue
+
+            arrays.append(vect)
+
+    return arrays
+
+
+def get_labelled_yn_data_for_person(person_id):
+    # british is 1:37
+    print 'getting labels for', person_id
+    yes_instances = instances(
+        '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p{person_id}/yes/'.format(person_id=person_id)
+    )
+
+    no_instances = instances(
+        '/home/duncan/Dropbox/Duncan/Dunctionary/samples/p{person_id}/no/'.format(person_id=person_id)
+    )
+
+    vectors = yes_instances + no_instances
+    labels = ([1] * len(yes_instances)) + ([0] * len(no_instances))
+    return vectors, labels
+
+
+british_ids = set(xrange(1, 38))
+test_person = 5
+british_ids.remove(test_person)
+print 'Test Person:', test_person
+
+
+test_vectors, test_labels = get_labelled_yn_data_for_person(test_person)
+
+training_vectors, training_labels = [], []
+
+for person_id in british_ids:
+    vectors, labels = get_labelled_yn_data_for_person(person_id)
+    training_vectors += vectors
+    training_labels += labels
+
+print 'Training vectors:', len(training_vectors)
+
+#yes_train, yes_test = yes_instances[:65], yes_instances[65:]
+#no_train, no_test = no_instances[:65], no_instances[65:]
+
+#training_vectors = yes_train + no_train
+#training_labels = ([1] * len(yes_train)) + ([0] * len(no_train))
+
+#test_vectors = yes_test + no_test
+#test_labels = ([1] * len(yes_test)) + ([0] * len(no_test))
+
+from predictor import train_and_test
+
+train_and_test(training_vectors, training_labels, test_vectors, test_labels)
