@@ -55,7 +55,7 @@ def get_labelled_number_data_for_person(person_id):
     return vectors, labels
 
 def test_person(person_id):
-    british_ids = set(xrange(1, 38))
+    british_ids = set(xrange(1, 48))
     test_person = person_id
     british_ids.remove(test_person)
     print 'Test Person:', test_person
@@ -76,7 +76,7 @@ def test_person(person_id):
 
 def run_numbers_test():
     total_right, total_wrong = 0, 0
-    for i in xrange(1, 38):
+    for i in xrange(1, 48):
         try:
             right, wrong = test_person(i)
             total_right += right
@@ -98,14 +98,14 @@ class ProbabilisticSVM(object):
         [score] = self.classifier.decision_function([vector])
         return probability(self.curve_data, score)
 
-def train_one_vs_all_models():
+def train_one_vs_all_models(person_id):
     prob_classifiers = []
 
-    score_person = 4
-    test_person = 15
+    #score_person = 4
+    test_person = person_id
 
     person_ids = set(xrange(1, 48))
-    person_ids.remove(score_person)
+    #person_ids.remove(score_person)
     person_ids.remove(test_person)
 
     for number in xrange(10):
@@ -119,14 +119,18 @@ def train_one_vs_all_models():
             training_labels += labels
 
         # get the scoring data
-        score_vectors, score_labels = get_labelled_number_data_for_person(score_person)
-        score_labels = [int(label == number) for label in score_labels]
+        #score_vectors, score_labels = get_labelled_number_data_for_person(score_person)
+        #score_labels = [int(label == number) for label in score_labels]
 
         classifier = train_with_data(training_vectors, training_labels)
-        scores = classifier.decision_function(score_vectors)
+        #scores = classifier.decision_function(score_vectors)
+        scores = classifier.decision_function(training_vectors)
 
-        yes_scores = [scores[index] for index in xrange(len(scores)) if score_labels[index] == 1]
-        no_scores = [scores[index] for index in xrange(len(scores)) if score_labels[index] == 0]
+        #yes_scores = [scores[index] for index in xrange(len(scores)) if score_labels[index] == 1]
+        #no_scores = [scores[index] for index in xrange(len(scores)) if score_labels[index] == 0]
+
+        yes_scores = [scores[index] for index in xrange(len(scores)) if training_labels[index] == 1]
+        no_scores = [scores[index] for index in xrange(len(scores)) if training_labels[index] == 0]
 
         curve_data = get_curve_params(yes_scores, no_scores)
         prob_classifiers.append(ProbabilisticSVM(classifier, curve_data))
@@ -147,7 +151,7 @@ def train_one_vs_all_models():
             hits += 1
 
     print 100 * (hits / float(len(test_labels))), '%'
-
+    return hits, len(test_labels)
     #test_scores = classifier.decision_function(test_vectors)
     #probabilities = [probability(curve_data, score) for score in test_scores]
     #probabilities_and_labels = zip(probabilities, test_labels)
@@ -157,8 +161,17 @@ def train_one_vs_all_models():
     # get scores for curve for p4
     # make predictions for p8
 
+def full_gamut():
+    total_hits, total_length = 0, 0
 
+    for person_id in xrange(1, 48):
+        hits, length = train_one_vs_all_models(person_id)
+        total_hits += hits
+        total_length += length
+
+    print 100 * (total_hits / float(total_length))
 
 if __name__ == '__main__':
-    #run_numbers_test()
-    train_one_vs_all_models()
+    run_numbers_test()
+    #train_one_vs_all_models()
+    #full_gamut()
